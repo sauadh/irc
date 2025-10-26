@@ -10,8 +10,10 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <csignal>
+#include <arpa/inet.h>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include "Client.hpp"
 
 #define RED "\e[1;31m"
@@ -19,24 +21,26 @@
 #define GRE "\e[1;32m"
 #define YEL "\e[1;33m"
 
+class Client;
 class Server
 {
 private:
 	int port;
 	int server_fd;
 	std::string password;
+	static bool Serversignal;
 	std::vector<struct pollfd> poll_fds;
-	std::map<int, Client> clients;
+	std::map<int, Client*> clients;
 	struct sockaddr_in address;
 	void errorExit(const std::string &msg);
 
 public:
 //check if cannonical form needed
-	Server();
 	Server(int port, const std::string &password);
 	~Server();
 
 	void initSocket();
+	void non_block(int server_fd);
 	void run();
 
 	// signal + cleanup

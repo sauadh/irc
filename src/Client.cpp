@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "Client.hpp"
+#include "../inc/Client.hpp"
 #include <unistd.h>
 #include <algorithm>
 #include <iostream>
@@ -36,7 +36,7 @@ Client::Client(int fd)
                     //destruvtor
 Client::~Client()
             {
-                std::cout << "Client destroyed: " << _nickname << std::endl;
+                std::cout << "Client destroyed: " << _fd << std::endl;
             }
 
 
@@ -76,26 +76,29 @@ void Client::appendToBuffer(const std::string& data)
             return  (_inputBuffer.find("\r\n") != std::string::npos || _inputBuffer.find("\n") != std::string::npos);
         }
 
-        std::string Client::extractMessage()    //first complete message
-        {
-            size_t pos = _inputBuffer.find("\r\n");
-            if (pos == std::string::npos)
-            {
-                pos = _inputBuffer.find("\n");
-                if(pos == std::string::npos)
-                return "";
-            }
-                    //extract the message
-            std::string message = _inputBuffer.substr(0, pos);
+std::string Client::extractMessage()
+{
+    size_t pos = _inputBuffer.find("\r\n");
+    if (pos == std::string::npos)
+    {
+        pos = _inputBuffer.find("\n");
+        if (pos == std::string::npos)
+            return "";
+    }
 
-                    //remove from buffer including the delimiter
-            if(_inputBuffer[pos] == '\r')
-               _inputBuffer.erase(0, pos + 2); // remove \r\n
-            else
-              _inputBuffer.erase(0, pos + 1);  //remove \name
+    // Extract the message
+    std::string message = _inputBuffer.substr(0, pos);
 
-              return message;
-        }
+    // Remove from buffer including the delimiter
+    if (_inputBuffer[pos] == '\r') {
+        _inputBuffer.erase(0, pos + 2); // remove \r\n
+    } else {
+        _inputBuffer.erase(0, pos + 1); // remove \n
+    }
+
+    return message;
+}
+
 
                                 //channel management
         
