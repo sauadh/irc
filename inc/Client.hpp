@@ -13,60 +13,67 @@
 #ifndef CLIENT_HPP
 #define CLIENT_HPP
 
-#include <string>       
-#include <vector>      
+#include <string>
+#include <vector>
 
 class Channel;
 
-class Client
-{ 
-        private: 
-        
-            int _fd;       
-            std::string _nickname;
-            std::string _username;
-            std::string _realname;
-            std::string _hostname;
+class Client { 
+private: 
+    // THE CLIENT'S IDENTITY
+    int _fd;
+    std::string _nickname;
+    std::string _username;
+    std::string _realname;
+    std::string _hostname;
 
-            bool _hasPassword;                 
-            bool _hasNick;
-            bool _hasUser;
-               
-            std::string _inputBuffer;
-            std::vector<Channel*> _joinedChannels;
+    // AUTHENTICATION STATUS
+    bool _hasPassword;
+    bool _hasNick;
+    bool _hasUser;
+    bool _isRegistered;
+    
+    // PARTIAL MESSAGE BUFFER
+    std::string _inputBuffer;
 
-        public:
-                            //CONSTRUCTOR
-            Client(int fd);
-            ~Client();
+    // CHANNELS THEY'RE IN        
+    std::vector<Channel*> _joinedChannels;
+    
+    // PRIVATE HELPER
+    void checkRegistration();  // ← ADD THIS! Private helper function
 
-                                        //authentication
-                                        
-                void    setPassword(bool val);
-                void    setNickname(const std::string& nick);
-                void    setUsername(const std::string& user, const std::string& real);
-                bool    isFullyAuthenticated() const;
+public:
+    // CONSTRUCTOR & DESTRUCTOR
+    Client(int fd);
+    ~Client();
 
-                                        //buffer managment
-                void    appendToBuffer(const std::string& data);
-                std::string extractMessage();
-                bool    hasCompleteMessage() const;
+    // AUTHENTICATION
+    void setPassword(bool val);
+    void setNickname(const std::string& nick);
+    void setUsername(const std::string& user, const std::string& real);
+    bool isFullyAuthenticated() const;
+    bool isRegistered() const;
+    
+    // BUFFER MANAGEMENT
+    void appendToBuffer(const std::string& data);
+    std::string extractMessage();
+    bool hasCompleteMessage() const;
 
-                                        //channel management
-                void    joinChannel(Channel* channel);
-                void    leaveChannel(Channel* channel);
-                bool    isInChannel(Channel* channel)  const;
-                std::vector<Channel*> getChannels() const;
+    // CHANNEL MANAGEMENT
+    void joinChannel(Channel* channel);
+    void leaveChannel(Channel* channel);
+    bool isInChannel(Channel* channel) const;
+    std::vector<Channel*> getChannels() const;
 
-                                        //getters
-                int getFd() const;
-                std::string     getNickname() const;
-                std::string     getUsername() const;
-                std::string     getRealname() const;
-                std::string     getPrefix()   const;
+    // GETTERS
+    int getFd() const;
+    std::string getNickname() const;
+    std::string getUsername() const;
+    std::string getRealname() const;
+    std::string getPrefix() const;
 
-                                        //message
-                void    sendMessage(const std::string& message);
+    // MESSAGING
+    void sendMessage(const std::string& message);
 };
 
 #endif
