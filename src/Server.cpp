@@ -175,39 +175,72 @@ while (client->hasCompleteMessage())
 
  }
 
+ Client* Server::GetClient(int fd)
+{
+    std::map<int, Client*>::iterator it = clients.find(fd);
+    if (it != clients.end())
+        return it->second;  // Found → return the Client pointer
+    return NULL;            // Not found → return null
+}
+
+
+//  bool Server::isRegistered(int fd)
+// {
+//     Client* client = GetClient(fd);
+//     if (!client)
+//         return false;
+
+//     if (client->getNickname().empty() ||
+//         client->getUsername().empty() ||
+//         client->getNickname() == "*" ||
+//         !client->isFullyAuthenticated())
+//         return false;
+
+//     return true;
+// }
+
+
 //  void Server::parseCommand(std::string &line, int fd)
 // {
 //     if (line.empty())
 //         return;
+
+//     // --- Trim leading/trailing spaces ---
+//     size_t start = line.find_first_not_of(" \t\r\n");
+//     size_t end = line.find_last_not_of(" \t\r\n");
+//     if (start == std::string::npos)
+//         return;
+//     line = line.substr(start, end - start + 1);
+
+//     // --- Split into command and args ---
 //     size_t spacePos = line.find(' ');
 //     std::string command;
 //     std::vector<std::string> args;
 
-//     // Split line into command + args
 //     if (spacePos != std::string::npos)
 //     {
-//         command = line.substr(0, spacePos);                  // command is before first space
-//         std::string rest = line.substr(spacePos + 1);       // everything after space
+//         command = line.substr(0, spacePos);
+//         std::string rest = line.substr(spacePos + 1);
 
-//         // Split rest by spaces into args
+//         // split args by spaces
 //         size_t pos = 0;
 //         while ((pos = rest.find(' ')) != std::string::npos)
 //         {
-//             args.push_back(rest.substr(0, pos));
+//             if (pos > 0)
+//                 args.push_back(rest.substr(0, pos));
 //             rest.erase(0, pos + 1);
 //         }
 //         if (!rest.empty())
-//             args.push_back(rest); // last argument
+//             args.push_back(rest);
 //     }
 //     else
-//     {
-//         command = line; // no space, whole line is command
-//     }
-//     // Convert command to uppercase (IRC commands are case-insensitive)
-//     for (auto &c : command)
-//         c = toupper(c);
+//         command = line;
 
-//     // Call the appropriate handler
+//     // --- Convert command to uppercase (IRC is case-insensitive) ---
+//     for (size_t i = 0; i < command.size(); ++i)
+//         command[i] = toupper(command[i]);
+
+//     // --- Registration commands ---
 //     if (command == "PASS")
 //         handlePass(args, fd);
 //     else if (command == "NICK")
@@ -216,7 +249,31 @@ while (client->hasCompleteMessage())
 //         handleUser(args, fd);
 //     else if (command == "QUIT")
 //         handleQuit(args, fd);
+
+//     // --- Only allow other commands if registered ---
+//     else if (isRegistered(fd)) // renamed from notregistered()
+//     {
+//         if (command == "JOIN")
+//             handleJoin(args, fd);
+//         else if (command == "PART")
+//             handlePart(args, fd);
+//         else if (command == "PRIVMSG")
+//             handlePrivmsg(args, fd);
+//         else if (command == "TOPIC")
+//             handleTopic(args, fd);
+//         else if (command == "KICK")
+//             handleKick(args, fd);
+//         else if (command == "MODE")
+//             handleMode(args, fd);
+//         else if (command == "INVITE")
+//             handleInvite(args, fd);
+//         else
+//             sendClientMessage(fd, "421 " + command + " :Unknown command");
+//     }
 //     else
-//         sendClientMessage(fd, "Unknown command: " + command);
+//     {
+//         // Not yet registered
+//         sendClientMessage(fd, "451 * :You have not registered");
+//     }
 // }
 

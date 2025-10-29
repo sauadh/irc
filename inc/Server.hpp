@@ -6,6 +6,8 @@
 #include <string>
 #include <map>
 #include <poll.h>
+#include <algorithm>
+#include <ctype.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -52,12 +54,17 @@ public:
 	void receiveClientData(int fd);
 	void removeClient(int fd);
 
+	void _sendResponse(std::string response, int fd);
+	bool is_validNickname(std::string& nickname);
+	bool nickNameInUse(std::string& nickname);
 	// command handling
 	void parseCommand(std::string &line, int fd);
-	void handlePASS(std::vector<std::string> &args, int fd);
-	void handleNICK(std::vector<std::string> &args, int fd);
-	void handleUSER(std::vector<std::string> &args, int fd);
-	void handleQUIT(std::vector<std::string> &args, int fd);
+	Client* GetClient(int fd);
+	bool isRegistered(int fd);
+	void handlePass(std::vector<std::string> &args, int fd);
+	void handleNick(std::vector<std::string> &args, int fd);
+	void handleUser(std::vector<std::string> &args, int fd);
+	void handleQuit(std::vector<std::string> &args, int fd);
 
 	const std::string &getPassword() const;
 };

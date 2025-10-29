@@ -31,6 +31,7 @@ class Client
             bool _hasPassword;                 
             bool _hasNick;
             bool _hasUser;
+            bool _registered;
                
             std::string _inputBuffer;
             std::vector<Channel*> _joinedChannels;
@@ -46,6 +47,9 @@ class Client
                 void    setNickname(const std::string& nick);
                 void    setUsername(const std::string& user, const std::string& real);
                 bool    isFullyAuthenticated() const;
+                void     setRegistered(bool value);
+
+                bool     getRegistered(bool value);
 
                                         //buffer managment
                 void    appendToBuffer(const std::string& data);
