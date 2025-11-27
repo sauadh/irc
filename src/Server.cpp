@@ -1,9 +1,10 @@
 #include "../inc/Server.hpp"
+#include "../inc/replies.hpp"
 
 bool Server::Serversignal = false;
 
 Server::Server(int port, const std::string &password)
-    : port(port), server_fd(-1), password(password) {}
+    : port(port), server_fd(-1), password(password), serverName("ircserv") {}
 
 Server::~Server()
 {
@@ -13,13 +14,13 @@ Server::~Server()
 
     if (server_fd != -1)
         close(server_fd);
+
     std::cout << "[Server] Closed successfully" << std::endl;
 }
 
-
 void Server::errorExit(const std::string &msg)
 {
-    std::cerr << "[Error] " << msg  << std::endl;
+    std::cerr << "[Error] " << msg << std::endl;
     if (server_fd != -1)
         close(server_fd);
     std::exit(EXIT_FAILURE);
@@ -27,11 +28,11 @@ void Server::errorExit(const std::string &msg)
 
 void Server::removeClient(int fd)
 {
-    std::cout << "[Server] Client is disconnected (fd =" << fd << ")" << std::endl;
+    std::cout << "[Server] Client is disconnected (fd = " << fd << ")" << std::endl;
 
     close(fd);
 
-    // Delete the client object first
+    // Remove from client map
     std::map<int, Client*>::iterator it = clients.find(fd);
     if (it != clients.end())
     {
@@ -40,7 +41,7 @@ void Server::removeClient(int fd)
     }
 
     // Remove from poll_fds
-    for (size_t i = 0; i < poll_fds.size(); i++)
+    for (size_t i = 0; i < poll_fds.size(); ++i)
     {
         if (poll_fds[i].fd == fd)
         {
@@ -49,7 +50,6 @@ void Server::removeClient(int fd)
         }
     }
 }
-
 
 void Server::signalHandler(int signum)
 {
@@ -94,7 +94,7 @@ void Server::initSocket()
     pd.revents = 0;
     poll_fds.push_back(pd);
 
-    std::cout  << "[Server] Listening on port " << port  << std::endl;
+    std::cout << "[Server] Listening on port " << port << std::endl;
 }
 
 void Server::run()
@@ -107,15 +107,18 @@ void Server::run()
         for (int i = poll_fds.size() - 1; i >= 0; --i)
         {
             int fd = poll_fds[i].fd;
+
             if (poll_fds[i].revents & POLLIN)
             {
                 if (fd == server_fd)
-                    this->acceptNewClient();
+                    acceptNewClient();
                 else
-                    this->receiveClientData(fd);
+                    receiveClientData(fd);
             }
             else if (poll_fds[i].revents & (POLLHUP | POLLERR | POLLNVAL))
+            {
                 removeClient(fd);
+            }
         }
     }
 }
@@ -140,20 +143,19 @@ void Server::acceptNewClient()
     pd.revents = 0;
     poll_fds.push_back(pd);
 
-    // ✅ Step 1: create the Client directly in-place
-    clients[clfd] = new Client(clfd);
+    Client *c = new Client(clfd);
+    AddClient(c);
 
-    // ✅ Step 2: log connection
     std::cout << "[Server] Client <" << clfd << "> Connected from "
               << inet_ntoa(cliaddr.sin_addr) << ":" << ntohs(cliaddr.sin_port)
               << std::endl;
 }
 
-
 void Server::receiveClientData(int fd)
 {
     char buff[1024];
     ssize_t bytes = recv(fd, buff, sizeof(buff) - 1, 0);
+
     if (bytes <= 0)
     {
         removeClient(fd);
@@ -162,118 +164,155 @@ void Server::receiveClientData(int fd)
 
     buff[bytes] = '\0';
 
-    // Use .at() to avoid default construction
-    Client* client = clients.at(fd);
-client->appendToBuffer(buff);
+    // Safe client lookup
+    std::map<int, Client*>::iterator it = clients.find(fd);
+    if (it == clients.end())
+    {
+        removeClient(fd);
+        return;
+    }
 
-while (client->hasCompleteMessage())
-{
-    std::string msg = client->extractMessage();
-    std::cout << "[Server] Received from fd=" << fd << ": " << msg << std::endl;
-    //parseCommand(msg, fd);
+    Client* client = it->second;
+    client->appendToBuffer(buff);
+
+    while (client->hasCompleteMessage())
+    {
+        std::string msg = client->extractMessage();
+        std::cout << "[Server] Received from fd=" << fd << ": " << msg << std::endl;
+
+        parseCommand(msg, fd);
+    }
 }
 
- }
-
- Client* Server::GetClient(int fd)
+Client* Server::GetClient(int fd)
 {
     std::map<int, Client*>::iterator it = clients.find(fd);
     if (it != clients.end())
-        return it->second;  // Found → return the Client pointer
-    return NULL;            // Not found → return null
+        return it->second;
+    return NULL;
 }
 
+void Server::AddClient(Client* newClient)
+{
+    if (newClient)
+        clients[newClient->getFd()] = newClient;
+}
 
-//  bool Server::isRegistered(int fd)
-// {
-//     Client* client = GetClient(fd);
-//     if (!client)
-//         return false;
+void Server::AddChannel(Channel newChannel)
+{
+    channels.push_back(newChannel);
+}
 
-//     if (client->getNickname().empty() ||
-//         client->getUsername().empty() ||
-//         client->getNickname() == "*" ||
-//         !client->isFullyAuthenticated())
-//         return false;
+void Server::AddFds(pollfd newFd)
+{
+    poll_fds.push_back(newFd);
+}
 
-//     return true;
-// }
+Client* Server::GetClientNick(const std::string& nickname)
+{
+    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); ++it)
+    {
+        if (it->second && it->second->getNickname() == nickname)
+            return it->second;
+    }
+    return NULL;
+}
 
+void Server::broadcastToAll(const std::string &message)
+{
+    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); ++it)
+    {
+        Client* client = it->second;
+        if (client && client->isRegistered())  // only send to registered clients
+        {
+            client->sendMessage(message);
+        }
+    }
+}
 
-//  void Server::parseCommand(std::string &line, int fd)
-// {
-//     if (line.empty())
-//         return;
+Channel* Server::GetChannel(const std::string& name)
+{
+    for (size_t i = 0; i < channels.size(); ++i)
+    {
+        if (channels[i].getName() == name)
+            return &channels[i];
+    }
+    return NULL;
+}
 
-//     // --- Trim leading/trailing spaces ---
-//     size_t start = line.find_first_not_of(" \t\r\n");
-//     size_t end = line.find_last_not_of(" \t\r\n");
-//     if (start == std::string::npos)
-//         return;
-//     line = line.substr(start, end - start + 1);
+void Server::parseCommand(std::string &line, int fd)
+{
+    Client* cli = GetClient(fd);
+    if (!cli)
+        return;
+    if (line.empty())
+        return;
 
-//     // --- Split into command and args ---
-//     size_t spacePos = line.find(' ');
-//     std::string command;
-//     std::vector<std::string> args;
+    // Trim space
+    size_t start = line.find_first_not_of(" \t\r\n");
+    size_t end   = line.find_last_not_of(" \t\r\n");
 
-//     if (spacePos != std::string::npos)
-//     {
-//         command = line.substr(0, spacePos);
-//         std::string rest = line.substr(spacePos + 1);
+    if (start == std::string::npos)
+        return;
 
-//         // split args by spaces
-//         size_t pos = 0;
-//         while ((pos = rest.find(' ')) != std::string::npos)
-//         {
-//             if (pos > 0)
-//                 args.push_back(rest.substr(0, pos));
-//             rest.erase(0, pos + 1);
-//         }
-//         if (!rest.empty())
-//             args.push_back(rest);
-//     }
-//     else
-//         command = line;
+    line = line.substr(start, end - start + 1);
 
-//     // --- Convert command to uppercase (IRC is case-insensitive) ---
-//     for (size_t i = 0; i < command.size(); ++i)
-//         command[i] = toupper(command[i]);
+    // Split command + args
+    size_t spacePos = line.find(' ');
+    std::string command;
+    std::vector<std::string> args;
 
-//     // --- Registration commands ---
-//     if (command == "PASS")
-//         handlePass(args, fd);
-//     else if (command == "NICK")
-//         handleNick(args, fd);
-//     else if (command == "USER")
-//         handleUser(args, fd);
-//     else if (command == "QUIT")
-//         handleQuit(args, fd);
+    if (spacePos != std::string::npos)
+    {
+        command = line.substr(0, spacePos);
+        std::string rest = line.substr(spacePos + 1);
 
-//     // --- Only allow other commands if registered ---
-//     else if (isRegistered(fd)) // renamed from notregistered()
-//     {
-//         if (command == "JOIN")
-//             handleJoin(args, fd);
-//         else if (command == "PART")
-//             handlePart(args, fd);
-//         else if (command == "PRIVMSG")
-//             handlePrivmsg(args, fd);
-//         else if (command == "TOPIC")
-//             handleTopic(args, fd);
-//         else if (command == "KICK")
-//             handleKick(args, fd);
-//         else if (command == "MODE")
-//             handleMode(args, fd);
-//         else if (command == "INVITE")
-//             handleInvite(args, fd);
-//         else
-//             sendClientMessage(fd, "421 " + command + " :Unknown command");
-//     }
-//     else
-//     {
-//         // Not yet registered
-//         sendClientMessage(fd, "451 * :You have not registered");
-//     }
-// }
+        size_t pos;
+        while ((pos = rest.find(' ')) != std::string::npos)
+        {
+            if (pos > 0)
+                args.push_back(rest.substr(0, pos));
+            rest.erase(0, pos + 1);
+        }
+        if (!rest.empty())
+            args.push_back(rest);
+    }
+    else
+        command = line;
 
+    // Uppercase command
+    for (size_t i = 0; i < command.size(); ++i)
+        command[i] = toupper(command[i]);
+
+    // Registration
+    if (command == "PASS") handlePass(args, fd);
+    else if (command == "NICK") handleNick(args, fd);
+    else if (command == "USER") handleUser(args, fd);
+    else if (command == "QUIT") handleQuit(args, fd);
+    else if (!cli->isRegistered())
+    {
+        Client *cli = GetClient(fd);
+        std::string nick = cli ? cli->getNickname() : "*";
+        _sendResponse(ERR_NOTREGISTERED(nick), fd);
+    }
+    else
+    {
+    // Now the client is fully registered.
+    // Add all future command handlers here.
+
+        if (command == "JOIN")
+            handleJoin(args, fd);
+        else if (command == "INVITE")
+            handleInvite(args, fd);
+        else if (command == "TOPIC")
+            handleTopic(args, fd);
+        else if (command == "KICK")
+            handleKick(args, fd);
+        else if (command == "mode")
+            handleMode(args, fd);
+
+    // If unknown command:
+        else
+             _sendResponse(ERR_CMDNOTFOUND(GetClient(fd)->getNickname(), command), fd);
+}
+}

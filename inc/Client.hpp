@@ -30,22 +30,30 @@ private:
             bool _hasPassword;                 
             bool _hasNick;
             bool _hasUser;
-            bool _registered;
+            bool _isRegistered;
+            bool _isAuthenticated;
+
                
             std::string _inputBuffer;
             std::vector<Channel*> _joinedChannels;
+            std::string _modes;  // stores user modes, e.g., "i"
+
 
 public:
     // CONSTRUCTOR & DESTRUCTOR
     Client(int fd);
     ~Client();
 
+    void setMode(char mode, bool add); // add or remove a mode
+    std::string getModes() const;      // get current modes as string
+
     // AUTHENTICATION
     void setPassword(bool val);
     void setNickname(const std::string& nick);
     void setUsername(const std::string& user, const std::string& real);
-    bool isFullyAuthenticated() const;
     bool isRegistered() const;
+    bool getisAuthenticated() const;
+    void checkRegistration();
     
     // BUFFER MANAGEMENT
     void appendToBuffer(const std::string& data);
@@ -63,6 +71,7 @@ public:
     std::string getNickname() const;
     std::string getUsername() const;
     std::string getRealname() const;
+    std::string getHostname() const;
     std::string getPrefix() const;
 
     // MESSAGING
